@@ -4,18 +4,20 @@ import 'package:http/http.dart' as http;
 import 'package:test_1_flutter/widgets/scaffold.dart';
 
 const String _apiKey = '30c670f';
-const String _baseUrl =
-    'http://www.omdbapi.com/?apikey=30c670f&page=10&type=movie&s=batman';
+const String _baseUrl = 'http://www.omdbapi.com/?apikey=30c670f&s=furious';
 
 class Movie {
-  final int imdbID;
+  final String imdbID;
   final String Title;
   final String? Poster;
 
   Movie({required this.imdbID, required this.Title, this.Poster});
 
-  factory Movie.fromJson(Map<String, dynamic> j) =>
-      Movie(imdbID: j['imdbID'], Title: j['Title'], Poster: j['Poster']);
+  factory Movie.fromJson(Map<String, dynamic> j) => Movie(
+    imdbID: j['imdbID'] as String,
+    Title: j['Title'] as String,
+    Poster: (j['Poster'] == 'N/A') ? null : j['Poster'] as String?,
+  );
 }
 
 class FilmListPage extends StatefulWidget {
@@ -25,10 +27,12 @@ class FilmListPage extends StatefulWidget {
   _FilmListPageState createState() => _FilmListPageState();
 }
 
+/// Page affichant une liste de films récupérés depuis une API.
+/// Permet de sélectionner/désélectionner des films en cliquant dessus.
+/// Les films sélectionnés sont mis en évidence par une bordure colorée et une ombre.
 class _FilmListPageState extends State<FilmListPage> {
   late Future<List<Movie>> _futureMovies;
-  final Set<int> _selectedIds = {};
-
+  final Set<String> _selectedIds = {};
   final title = "Films";
 
   @override
@@ -37,19 +41,24 @@ class _FilmListPageState extends State<FilmListPage> {
     _futureMovies = _fetchNowPlaying();
   }
 
+  /// Récupère la liste des films depuis l'API OMDb.
   Future<List<Movie>> _fetchNowPlaying() async {
     final uri = Uri.parse(_baseUrl);
     final res = await http.get(uri);
     if (res.statusCode != 200) throw Exception('Erreur API: ${res.statusCode}');
-    final data = json.decode(res.body);
-    final resultsss = data.Search[0];
-    final results = data[0]!.value as List<dynamic>;
+
+    final Map<String, dynamic> data =
+        json.decode(res.body) as Map<String, dynamic>;
+    final List<dynamic>? results = data['Search'] as List<dynamic>?;
+    if (results == null) return [];
+
     return results
         .map((e) => Movie.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
-  void _toggleSelected(int id) {
+  /// Bascule l'état de sélection d'un film par son ID.
+  void _toggleSelected(String id) {
     setState(() {
       if (_selectedIds.contains(id)) {
         _selectedIds.remove(id);
@@ -63,6 +72,8 @@ class _FilmListPageState extends State<FilmListPage> {
   Widget build(BuildContext context) {
     return AppScaffold(
       title: this.title,
+      likedCount: _selectedIds.length,
+      showLikedCount: true,
       body: FutureBuilder<List<Movie>>(
         future: _futureMovies,
         builder: (context, snapshot) {
@@ -105,7 +116,7 @@ class _FilmListPageState extends State<FilmListPage> {
                             BoxShadow(
                               color: Theme.of(
                                 context,
-                              ).colorScheme.primary.withOpacity(0.2),
+                              ).colorScheme.primary.withValues(alpha: 0.2),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
